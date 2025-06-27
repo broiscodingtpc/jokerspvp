@@ -4,6 +4,9 @@ services:
     env: node
     buildCommand: npm install && npm run build
     startCommand: npm start
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production

@@ -9,6 +9,7 @@
     "start": "node server-render.js",
     "local": "node server.js",
     "ngrok": "node start-ngrok.js",
+    "keep-alive": "node keep-alive.js",
     "postinstall": "npm run build"
   },
   "dependencies": {
