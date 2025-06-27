@@ -2,7 +2,7 @@
   "name": "jokerduelgamesbot",
   "version": "1.0.0",
   "description": "Telegram bot for 1v1 SPL token duels on Solana",
-  "main": "dist/api/bot.js",
+  "main": "server-render.js",
   "scripts": {
     "dev": "vercel dev",
     "build": "tsc",
