@@ -1,0 +1,21 @@
+services:
+  - type: worker
+    name: joker-duel-games-bot
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BOT_TOKEN
+        sync: false
+      - key: TOKEN_MINT
+        sync: false
+      - key: RPC_URL
+        value: https://api.mainnet-beta.solana.com
+      - key: CHART_WALLET
+        sync: false
+      - key: ENCRYPT_SECRET
+        sync: false
+      - key: PUBLIC_URL
+        value: https://joker-duel-games-bot.onrender.com 

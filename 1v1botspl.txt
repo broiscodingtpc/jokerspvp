@@ -1,0 +1,104 @@
+✅ PROMPT CURSOR – BOT DE PRODUCTION, HOSTED PE VERCEL
+markdown
+Copy
+Edit
+Create a full-featured production-ready Telegram bot named `jokerduelgamesbot` in TypeScript, using `node-telegram-bot-api`.
+
+The bot enables 1v1 duels using an SPL token on the Solana blockchain.
+
+---
+
+🌐 The bot will be hosted on **Vercel**, using **webhook**, not polling.  
+Do not use `setPolling: true`. Instead, configure `setWebHook()` to point to `/api/bot`.
+
+---
+
+🔧 REQUIRED FEATURES:
+
+1. ✅ Telegram Commands:
+   - `/start`: Initializes user and shows info
+   - `/duel <amount>`: Starts a duel and waits for a second user
+   - `/join`: Joins a pending duel
+   - `/balance`: Shows current SPL token balance
+   - `/deposit`: Shows user’s unique Solana deposit wallet address
+   - `/withdraw <amount>`: Requests withdrawal
+   - `/stats`: Show wins/losses
+   - `/leaderboard`: Show weekly top winners
+
+2. 🔐 Wallet System:
+   - Generate 1 custodial Solana wallet per Telegram user
+   - Store private keys encrypted using `crypto` and a secret from `.env`
+   - Use `@solana/web3.js` and `@solana/spl-token`
+
+3. 🪙 SPL Token Logic:
+   - Token mint from `.env`
+   - Deposits: users must send tokens to their generated wallet
+   - Bot checks transactions via Solana JSON-RPC (`getSignaturesForAddress`, `getParsedTransaction`)
+   - Credits user balance locally in SQLite
+
+4. 🎮 Duel Flow:
+   - User A does `/duel 1000`
+   - User B does `/join`
+   - If both have sufficient balance, bot randomly picks winner
+   - 5% of total pot is sent to `CHART_WALLET` from `.env`
+   - 95% is sent to winner
+
+5. 🗃️ Database:
+   - Use SQLite (`better-sqlite3`) for storing:
+     - users (telegram_id, username, wallet, enc_privkey, wins, losses, balance)
+     - duels (id, player1, player2, amount, winner, timestamp)
+
+6. 🔄 Webhook Handler:
+   - Create `/api/bot.ts`
+   - Inside, handle all Telegram updates with `bot.processUpdate(req.body)`
+
+7. 📁 Structure:
+/api
+bot.ts # Webhook handler
+/lib
+wallet.ts # Wallet creation and SPL interactions
+duel.ts # Matchmaking logic
+tokenChecker.ts # RPC polling + balance updates
+db.ts # SQLite wrapper
+.env
+vercel.json
+
+bash
+Copy
+Edit
+
+8. ⚙️ .env Example:
+BOT_TOKEN=telegram_token_here
+TOKEN_MINT=spl_token_mint_address
+RPC_URL=https://api.mainnet-beta.solana.com
+CHART_WALLET=chart_support_wallet
+ENCRYPT_SECRET=super_secret_encryption_key
+PUBLIC_URL=https://jokerduelgamesbot.vercel.app
+
+css
+Copy
+Edit
+
+9. 🔧 vercel.json config:
+```json
+{
+  "version": 2,
+  "builds": [{ "src": "api/bot.ts", "use": "@vercel/node" }],
+  "routes": [{ "src": "/api/bot", "dest": "api/bot.ts" }]
+}
+📣 Set Webhook After Deploy:
+After deployment, run this curl command:
+
+bash
+Copy
+Edit
+curl -F "url=https://jokerduelgamesbot.vercel.app/api/bot" https://api.telegram.org/bot<BOT_TOKEN>/setWebhook
+🧠 Notes:
+
+All SPL transfers are tracked using direct JSON-RPC calls — no Helius, no cost
+
+Make the bot ready to support 1000s of users
+
+Use SQLite locally; keep db in /data/data.sqlite
+
+Implement reusable functions for reading & sending tokens with Solana web3

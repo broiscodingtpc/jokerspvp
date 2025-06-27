@@ -1,0 +1,61 @@
+🎮 **$JOKER DUEL GAMES BOT - BETA TESTING IS LIVE!** 🎮
+
+⚡ **BETA TESTING OPEN FOR 1 HOUR TODAY!** ⚡
+
+🎭 *The Joker's twisted game of chance has arrived on Solana!*
+
+🔥 **WHAT IS IT?**
+• 1v1 $JOKER Token Battles on Solana blockchain
+• Real $JOKER duels with instant payouts
+• 95% goes to winner, 5% to chart support
+• Random winner selection - pure luck!
+
+⚔️ **HOW TO PLAY:**
+
+1️⃣ **GET YOUR WALLET**
+   • Go to @jokerspvpbot in private chat
+   • Click "Register Wallet" or send /start
+   • Get your unique wallet address
+
+2️⃣ **LOAD YOUR WALLET**
+   • Send $JOKER tokens to your wallet address
+   • Send 0.01 SOL for transaction fees
+   • Wait 1-2 minutes for confirmations
+
+3️⃣ **START DUELING**
+   • Use /duel 100 to start a 100 $JOKER duel
+   • Use /join to join available duels
+   • Winner gets 95% of the pot instantly!
+
+🎯 **QUICK COMMANDS:**
+• `/start` - Start the bot
+• `/duel 100` - Start 100 $JOKER duel
+• `/join` - Join available duels
+• `/balance` - Check your balance (private)
+• `/stats` - View your stats (private)
+
+💰 **MINIMUM REQUIREMENTS:**
+• 10-500 $JOKER tokens per duel
+• 0.01 SOL for transaction fees
+• $JOKER token only
+
+🏆 **FEATURES:**
+• Real $JOKER blockchain transfers
+• Instant payouts
+• Statistics tracking
+• Leaderboard system
+• Private wallet management
+
+⚠️ **IMPORTANT:**
+• Keep your wallet address private
+• Only send $JOKER tokens
+• All transactions are public on Solana
+• No central authority - pure blockchain
+
+🎪 **JOIN THE JOKER'S ARENA NOW!**
+@jokerspvpbot
+
+⏰ **BETA TESTING: 1 HOUR ONLY!**
+🎲 *Test your luck in the Joker's twisted game with $JOKER!*
+
+#JOKER #Solana #Duel #Gaming #Blockchain #Beta 

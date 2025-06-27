@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/bot.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/bot",
+      "dest": "api/bot.ts"
+    }
+  ],
+  "functions": {
+    "api/bot.ts": {
+      "maxDuration": 30
+    }
+  },
+  "outputDirectory": ".",
+  "includeFiles": [
+    "assets/**/*"
+  ]
+} 

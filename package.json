@@ -1,0 +1,36 @@
+{
+  "name": "jokerduelgamesbot",
+  "version": "1.0.0",
+  "description": "Telegram bot for 1v1 SPL token duels on Solana",
+  "main": "dist/api/bot.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "tsc",
+    "start": "node server-render.js",
+    "local": "node server.js",
+    "ngrok": "node start-ngrok.js",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.3.9",
+    "@solana/web3.js": "^1.87.6",
+    "body-parser": "^1.20.2",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "ngrok": "^5.0.0-beta.1",
+    "node-telegram-bot-api": "^0.64.0",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@types/node-telegram-bot-api": "^0.64.0",
+    "@types/sqlite3": "^3.1.11",
+    "@vercel/node": "^3.0.0",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
