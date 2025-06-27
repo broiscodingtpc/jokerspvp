@@ -3,7 +3,7 @@ services:
     name: joker-duel-games-bot
     env: node
     buildCommand: npm install && npm run build
-    startCommand: node server-render.js
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
 });
 
 // Import and use the bot handler
-const botHandler = require('./dist/api/bot');
+const botHandler = require('./dist/api/bot').default;
 app.post('/api/bot', botHandler);
 
 // Start server
