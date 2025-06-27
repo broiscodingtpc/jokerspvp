@@ -17,6 +17,8 @@ dotenv_1.default.config();
 const bot = new node_telegram_bot_api_1.default(process.env.BOT_TOKEN || '', { polling: false });
 // Store active group chats for announcements
 const activeGroupChats = new Set();
+// Store last announcement message IDs for each chat to delete old ones
+const lastAnnouncementMessages = new Map();
 // Animated duel function
 async function playDuelAnimation(chatId, player1Name, player2Name, amount, onComplete) {
     console.log(`Starting animation for ${player1Name} vs ${player2Name}`);
@@ -129,7 +131,19 @@ async function announceActiveDuels() {
         // Send to all active group chats
         for (const chatId of activeGroupChats) {
             try {
-                await bot.sendPhoto(chatId, './assets/images/duels-banner.png', {
+                // Delete previous announcement message if it exists
+                const lastMessageId = lastAnnouncementMessages.get(chatId);
+                if (lastMessageId) {
+                    try {
+                        await bot.deleteMessage(chatId, lastMessageId);
+                        console.log(`Deleted old announcement message ${lastMessageId} in chat ${chatId}`);
+                    }
+                    catch (deleteError) {
+                        console.log(`Could not delete old announcement message ${lastMessageId} in chat ${chatId}:`, deleteError);
+                    }
+                }
+                // Send new announcement
+                const newMessage = await bot.sendPhoto(chatId, './assets/images/duels-banner.png', {
                     caption: announcementText,
                     parse_mode: 'Markdown',
                     reply_markup: {
@@ -137,23 +151,40 @@ async function announceActiveDuels() {
                     },
                     disable_notification: true // Silent announcement
                 });
+                // Store the new message ID for future deletion
+                lastAnnouncementMessages.set(chatId, newMessage.message_id);
+                console.log(`Sent new announcement message ${newMessage.message_id} to chat ${chatId}`);
             }
             catch (error) {
                 console.log(`Failed to send announcement to chat ${chatId}:`, error);
                 // Try fallback to text message
                 try {
-                    await bot.sendMessage(chatId, announcementText, {
+                    // Delete previous announcement message if it exists
+                    const lastMessageId = lastAnnouncementMessages.get(chatId);
+                    if (lastMessageId) {
+                        try {
+                            await bot.deleteMessage(chatId, lastMessageId);
+                        }
+                        catch (deleteError) {
+                            console.log(`Could not delete old announcement message ${lastMessageId} in chat ${chatId}:`, deleteError);
+                        }
+                    }
+                    const newMessage = await bot.sendMessage(chatId, announcementText, {
                         parse_mode: 'Markdown',
                         reply_markup: {
                             inline_keyboard: inlineKeyboard
                         },
                         disable_notification: true
                     });
+                    // Store the new message ID for future deletion
+                    lastAnnouncementMessages.set(chatId, newMessage.message_id);
+                    console.log(`Sent fallback announcement message ${newMessage.message_id} to chat ${chatId}`);
                 }
                 catch (fallbackError) {
                     console.log(`Failed to send fallback announcement to chat ${chatId}:`, fallbackError);
                     // Remove inactive chat from set
                     activeGroupChats.delete(chatId);
+                    lastAnnouncementMessages.delete(chatId);
                 }
             }
         }
@@ -363,6 +394,9 @@ bot.on('callback_query', async (callbackQuery) => {
             case 'register_wallet':
                 await handleRegisterWallet(telegramId, chatId, callbackQueryId);
                 break;
+            case 'get_wallet_private':
+                await handleGetWalletPrivate(telegramId, chatId, callbackQueryId);
+                break;
             case 'start_duel':
                 await handleStartDuel(telegramId, chatId, messageId, callbackQueryId);
                 break;
@@ -520,12 +554,110 @@ async function handleRegisterWallet(telegramId, groupChatId, callbackQueryId) {
     }
     catch (error) {
         console.error('Error in handleRegisterWallet:', error);
+        await bot.answerCallbackQuery(callbackQueryId, { text: 'Error occurred' });
+    }
+}
+// Handle get wallet private (new function)
+async function handleGetWalletPrivate(telegramId, groupChatId, callbackQueryId) {
+    try {
+        const user = await db_1.db.getUser(telegramId);
+        if (!user) {
+            await bot.answerCallbackQuery(callbackQueryId, { text: 'User not found' });
+            return;
+        }
+        // Answer callback immediately
+        await bot.answerCallbackQuery(callbackQueryId, { text: 'Opening private chat...' });
         try {
-            await bot.answerCallbackQuery(callbackQueryId, { text: 'Error opening private chat' });
+            // Send wallet information to private chat
+            const connection = new web3_js_1.Connection(process.env.RPC_URL || 'https://api.mainnet-beta.solana.com');
+            const walletPubkey = new web3_js_1.PublicKey(user.wallet);
+            const solBalance = await connection.getBalance(walletPubkey);
+            const tokenBalance = await wallet_1.walletManager.getTokenBalance(telegramId);
+            const stats = await duel_1.duelManager.getUserStats(telegramId);
+            const walletMessage = `
+🔐 *YOUR WALLET DASHBOARD*
+
+*Wallet Address:* \`${user.wallet}\`
+
+💰 *Current Balances:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 💎 SOL: \`${(solBalance / 1e9).toFixed(4)} SOL\`
+• 🪙 Tokens: \`${tokenBalance} SPL\`
+
+📊 *Your Battle Stats:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 🏆 Wins: \`${stats.wins}\` | 💀 Losses: \`${stats.losses}\`
+• 📈 Win Rate: \`${stats.winRate}%\`
+• 🎯 Total Games: \`${stats.wins + stats.losses}\`
+
+🚀 *Quick Actions:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ Send SPL tokens to your wallet address
+2️⃣ Send 0.01 SOL for transaction fees
+3️⃣ Wait 1-2 minutes for confirmations
+4️⃣ Return to group and use /duel or /join
+
+⚠️ *Keep your wallet address private!*
+`;
+            const privateKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: '💰 Refresh Balance', callback_data: 'private_balance' },
+                        { text: '📥 Deposit', callback_data: 'private_deposit' }
+                    ],
+                    [
+                        { text: '📤 Withdraw Tokens', callback_data: 'private_withdraw' },
+                        { text: '📊 Stats', callback_data: 'private_stats' }
+                    ],
+                    [
+                        { text: '❌ Cancel Duel', callback_data: 'private_cancel_duel' },
+                        { text: '💎 Withdraw SOL', callback_data: 'private_withdraw_sol' }
+                    ],
+                    [
+                        { text: '🔐 Export Wallet', callback_data: 'private_export_wallet' }
+                    ]
+                ]
+            };
+            await bot.sendMessage(telegramId, walletMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: privateKeyboard
+            });
+            // Send confirmation in group
+            await bot.sendMessage(groupChatId, `✅ @${user.username || `User${telegramId}`} check your private chat for wallet details!`, { parse_mode: 'Markdown' });
         }
-        catch (callbackError) {
-            console.log('Could not answer callback query:', callbackError);
+        catch (error) {
+            console.log('Could not send private message, sending group instructions');
+            // Fallback: send instructions in group
+            const errorMessage = `
+❌ *Private Chat Required*
+
+*To get your wallet:*
+
+1️⃣ Click the button below to open private chat
+2️⃣ Press "Start" in private chat
+3️⃣ Get your wallet and instructions
+4️⃣ Return here and use commands
+
+*Commands:*
+• \`/duel 100\` - Start duel
+• \`/join\` - Join duel
+`;
+            const groupKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: '🔐 Open Private Chat', url: `https://t.me/jokerspvpbot?start=wallet` }
+                    ]
+                ]
+            };
+            await bot.sendMessage(groupChatId, errorMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: groupKeyboard
+            });
         }
+    }
+    catch (error) {
+        console.error('Error in handleGetWalletPrivate:', error);
+        await bot.answerCallbackQuery(callbackQueryId, { text: 'Error occurred' });
     }
 }
 // Handle start duel menu
@@ -1224,71 +1356,167 @@ ${tokenBalance < 10 ? '⚠️ Need tokens!' : '✅ Tokens OK'}
                         }
                     }
                     if (user) {
-                        try {
-                            // Send menu image with buttons
-                            await bot.sendPhoto(chatId, './assets/images/menu-banner.png', {
-                                caption: `
-🎮 *JOKER DUEL GAMES* 🎮
+                        // Check if this is a private chat
+                        if (msg.chat.type === 'private') {
+                            // Private chat - show wallet information
+                            const connection = new web3_js_1.Connection(process.env.RPC_URL || 'https://api.mainnet-beta.solana.com');
+                            const walletPubkey = new web3_js_1.PublicKey(user.wallet);
+                            try {
+                                const solBalance = await connection.getBalance(walletPubkey);
+                                const tokenBalance = await wallet_1.walletManager.getTokenBalance(telegramId);
+                                const stats = await duel_1.duelManager.getUserStats(telegramId);
+                                const privateWelcomeMessage = `
+🎮 *JOKER DUEL GAMES - WALLET DASHBOARD*
 
-Welcome, **${username}**! 
+🔐 *Wallet Address:* \`${user.wallet}\`
 
-⚔️ *Ready to duel?*
-💰 *Ready to win?*
-🎯 *Ready to dominate?*
-
-Choose your action below:
+💰 *Current Balances:*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`,
-                                parse_mode: 'Markdown',
-                                reply_markup: {
+• 💎 SOL: \`${(solBalance / 1e9).toFixed(4)} SOL\`
+• 🪙 Tokens: \`${tokenBalance} SPL\`
+
+📊 *Your Battle Stats:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 🏆 Wins: \`${stats.wins}\` | 💀 Losses: \`${stats.losses}\`
+• 📈 Win Rate: \`${stats.winRate}%\`
+• 🎯 Total Games: \`${stats.wins + stats.losses}\`
+
+🚀 *Quick Actions:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ Send SPL tokens to your wallet address
+2️⃣ Send 0.01 SOL for transaction fees  
+3️⃣ Wait 1-2 minutes for confirmations
+4️⃣ Return to group and use /duel or /join
+
+⚠️ *Keep your wallet address private!*
+`;
+                                const privateKeyboard = {
                                     inline_keyboard: [
                                         [
-                                            { text: '⚔️ Start Duel', callback_data: 'start_duel' },
-                                            { text: '🎯 Join Duel', callback_data: 'join_duel' }
+                                            { text: '💰 Refresh Balance', callback_data: 'private_balance' },
+                                            { text: '📥 Deposit', callback_data: 'private_deposit' }
                                         ],
                                         [
-                                            { text: '💰 Balance', callback_data: 'register_wallet' },
-                                            { text: '📊 Leaderboard', callback_data: 'leaderboard' }
+                                            { text: '📤 Withdraw Tokens', callback_data: 'private_withdraw' },
+                                            { text: '📊 Stats', callback_data: 'private_stats' }
                                         ],
                                         [
-                                            { text: '❓ How to Play', callback_data: 'how_to_play' }
+                                            { text: '❌ Cancel Duel', callback_data: 'private_cancel_duel' },
+                                            { text: '💎 Withdraw SOL', callback_data: 'private_withdraw_sol' }
+                                        ],
+                                        [
+                                            { text: '🔐 Export Wallet', callback_data: 'private_export_wallet' }
+                                        ],
+                                        [
+                                            { text: '🔙 Back to Menu', callback_data: 'back_to_menu' }
                                         ]
                                     ]
-                                }
-                            });
+                                };
+                                await bot.sendMessage(chatId, privateWelcomeMessage, {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: privateKeyboard
+                                });
+                            }
+                            catch (error) {
+                                console.error('Error getting wallet info:', error);
+                                const fallbackMessage = `
+🎮 *JOKER DUEL GAMES - WALLET DASHBOARD*
+
+🔐 *Wallet Address:* \`${user.wallet}\`
+
+🚀 *Quick Actions:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ Send SPL tokens to your wallet address
+2️⃣ Send 0.01 SOL for transaction fees
+3️⃣ Wait 1-2 minutes for confirmations
+4️⃣ Return to group and use /duel or /join
+
+⚠️ *Keep your wallet address private!*
+`;
+                                const privateMenuKeyboard = {
+                                    inline_keyboard: [
+                                        [
+                                            { text: '💰 Refresh Balance', callback_data: 'private_balance' },
+                                            { text: '💳 Deposit', callback_data: 'private_deposit' }
+                                        ],
+                                        [
+                                            { text: '💸 Withdraw', callback_data: 'private_withdraw' },
+                                            { text: '📊 Stats', callback_data: 'private_stats' }
+                                        ]
+                                    ]
+                                };
+                                await bot.sendMessage(chatId, fallbackMessage, {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: privateMenuKeyboard
+                                });
+                            }
                         }
-                        catch (error) {
-                            console.error('Error sending menu image:', error);
-                            // Fallback to text message
-                            await bot.sendMessage(chatId, `
-🎮 *JOKER DUEL GAMES* 🎮
+                        else {
+                            // Group chat - show interactive menu with leaderboard and tutorial
+                            // Get top 3 leaderboard
+                            const leaderboard = await duel_1.duelManager.getLeaderboard();
+                            let leaderboardText = '';
+                            if (leaderboard.length > 0) {
+                                leaderboardText = '\n🏆 *TOP 3 WARRIORS*\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+                                leaderboard.slice(0, 3).forEach((entry, index) => {
+                                    const uname = entry.username ? `@${entry.username}` : `User${entry.telegram_id}`;
+                                    const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+                                    leaderboardText += `${emoji} *${uname}* — ${entry.wins}W/${entry.losses}L\n`;
+                                });
+                            }
+                            else {
+                                leaderboardText = '\n🎯 *No battles yet - Be the first champion!*';
+                            }
+                            const welcomeMessage = `
+🎮 *JOKER DUEL GAMES*
 
-Welcome, **${username}**! 
+⚔️ *1v1 SPL Token Battles on Solana*
 
-⚔️ *Ready to duel?*
-💰 *Ready to win?*
-🎯 *Ready to dominate?*
+${leaderboardText}
 
-Choose your action below:
+📋 *How to Start:*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`, {
-                                parse_mode: 'Markdown',
-                                reply_markup: {
-                                    inline_keyboard: [
-                                        [
-                                            { text: '⚔️ Start Duel', callback_data: 'start_duel' },
-                                            { text: '🎯 Join Duel', callback_data: 'join_duel' }
-                                        ],
-                                        [
-                                            { text: '💰 Balance', callback_data: 'register_wallet' },
-                                            { text: '📊 Leaderboard', callback_data: 'leaderboard' }
-                                        ],
-                                        [
-                                            { text: '❓ How to Play', callback_data: 'how_to_play' }
-                                        ]
+1️⃣ Click "🔐 Get Your Wallet" below
+2️⃣ Bot will send you wallet details in private
+3️⃣ Send SPL tokens + 0.01 SOL for fees
+4️⃣ Return here and use /duel or /join
+
+🎯 *Commands:*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• \`/duel 100\` - Start a 100 token duel
+• \`/join\` - Join pending duel
+• \`/pvp\` - Open this menu
+
+⚡ *Active duels are announced every 3 minutes!*
+`;
+                            const menuKeyboard = {
+                                inline_keyboard: [
+                                    [
+                                        { text: '🔐 Get Your Wallet', callback_data: 'get_wallet_private' },
+                                        { text: '⚔️ Start Duel', callback_data: 'start_duel' }
+                                    ],
+                                    [
+                                        { text: '📊 Full Leaderboard', callback_data: 'leaderboard' },
+                                        { text: 'ℹ️ How to Play', callback_data: 'how_to_play' }
                                     ]
-                                }
-                            });
+                                ]
+                            };
+                            try {
+                                // Send image with caption for group chats
+                                await bot.sendPhoto(chatId, './assets/images/menu-banner.png', {
+                                    caption: welcomeMessage,
+                                    parse_mode: 'Markdown',
+                                    reply_markup: menuKeyboard
+                                });
+                            }
+                            catch (error) {
+                                console.error('Error sending menu image:', error);
+                                // Fallback to text message if image fails
+                                await bot.sendMessage(chatId, welcomeMessage, {
+                                    parse_mode: 'Markdown',
+                                    reply_markup: menuKeyboard
+                                });
+                            }
                         }
                     }
                 }
